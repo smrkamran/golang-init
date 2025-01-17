@@ -37,7 +37,6 @@ func (a *APIServer) handleAccount(w http.ResponseWriter, r *http.Request) error 
 }
 
 func (s *APIServer) handleGetAccount(w http.ResponseWriter, r *http.Request) error {
-
 	return WriteJSON(w, http.StatusOK, &Account{})
 }
 
