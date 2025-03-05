@@ -8,8 +8,17 @@ import (
 	"github.com/anthdm/hollywood/actor"
 )
 
+type Inventory struct {
+	Bottles int
+}
+
 type Player struct {
-	HP int
+	HP           int
+	inventoryPID *actor.PID
+}
+
+type DrinkBottle struct {
+	amount int
 }
 
 func NewPlayer(hp int) actor.Producer {
@@ -18,8 +27,27 @@ func NewPlayer(hp int) actor.Producer {
 	}
 }
 
-type TakeDamage struct {
-	amount int
+func NewInventory(bottles int) actor.Producer {
+	return func() actor.Receiver {
+		return &Inventory{Bottles: bottles}
+	}
+}
+
+func (p *Inventory) Receive(c *actor.Context) {
+
+	switch msg := c.Message().(type) {
+	case actor.Started:
+		_ = msg
+		fmt.Println("Inventory started")
+		c.Engine().Subscribe(c.PID())
+	case actor.Stopped:
+		fmt.Println("Inventory stopped")
+	case DrinkBottle:
+		fmt.Println("Inventory received drink bottle message")
+	case MyEvent:
+		fmt.Println("Inventory received message: ", msg.foo)
+	}
+
 }
 
 func (p *Player) Receive(c *actor.Context) {
@@ -27,12 +55,20 @@ func (p *Player) Receive(c *actor.Context) {
 	switch msg := c.Message().(type) {
 	case actor.Started:
 		fmt.Println("Player started")
+		p.inventoryPID = c.SpawnChild(NewInventory(1), "inventory")
+		c.Engine().Subscribe(c.PID())
 	case actor.Stopped:
 		fmt.Println("Player stopped")
-	case TakeDamage:
-		fmt.Println("Player is taking damage: ", msg.amount)
+	case DrinkBottle:
+		c.Forward(p.inventoryPID)
+	case MyEvent:
+		fmt.Println("Player received message: ", msg.foo)
 	}
 
+}
+
+type MyEvent struct {
+	foo string
 }
 
 func main() {
@@ -43,13 +79,10 @@ func main() {
 
 	pid := e.Spawn(NewPlayer(100), "player", actor.WithID("myuserid69"))
 
-	msg := TakeDamage{amount: 999}
-
-	for i := 0; i < 100; i++ {
-		e.Send(pid, msg)
-	}
+	e.Send(pid, DrinkBottle{amount: 55})
 
 	time.Sleep(time.Second * 2)
 
-	fmt.Println("Process id", pid)
+	e.BroadcastEvent(MyEvent{foo: "This is the mssage"})
+	time.Sleep(time.Second * 2)
 }
